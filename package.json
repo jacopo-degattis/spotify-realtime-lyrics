@@ -1,0 +1,19 @@
+{
+  "type": "module",
+  "name": "spotify-realtime-lyrics",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "chrome-cookies-secure": "^2.0.0",
+    "node-fetch": "^3.2.10",
+    "run-applescript": "^6.0.0",
+    "spotify-node-applescript": "^1.1.1"
+  }
+}

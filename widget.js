@@ -31,24 +31,11 @@ interface RealtimeLyrics {
     hasVocalRemoval: boolean
 }
 
-/*
-<label v-for="line in lyrics">
-    <template v-if="line.startTimeMs === position.toString()">            
-        <b>{{line.words}}</b>
-    </template>
-    <template v-else>
-        {{line.words}}
-    </template>
-</label>
-*/
-
-/* // TEST: {{line}} */
-
 const wgt: WidgetAPI = await widget(`
 
     <div class="main-container">
         <header>
-            <h2>{{title}} - {{artist}} - {{position}}</h2>
+            <h2>{{title}} - {{artist}}</h2>
         </header>
         <div v-if="isLoading">
             Loading...
@@ -56,10 +43,10 @@ const wgt: WidgetAPI = await widget(`
         <div class="lyrics-container" v-else>
             <label v-for="(line, index) in lyrics">
                 <template v-if="currentLine === index">            
-                    <b>{{line.words}}</b>
+                    <div class="highlighted">{{line.words}}</div>
                 </template>
                 <template v-else>
-                    {{line.words}}
+                    <div id="unfocused-line" class="grayed-out">{{line.words}}</div>
                 </template>
             </label>
         </div>
@@ -79,15 +66,30 @@ const wgt: WidgetAPI = await widget(`
             padding-left: 0px;
         }
 
+        .highlighted {
+            color: white;
+        }
+
+        .grayed-out {
+            color: #2e2e2e;
+        }
+
+        // .grayed-out:hover {
+        //     cursor: pointer;
+        //     color: white;
+        // }
+
         .lyrics-container > label {
             display: block;
+            font-size: 1.4rem;
         }
 
     </style>
 `, {
     width: 700,
     height: 1200,
-    alwaysOnTop: true
+    alwaysOnTop: true,
+    backgroundColor: "#7C7B7C"
 })
 
 const syncLyrics = (lyrics: any, time: any) => {
@@ -113,7 +115,7 @@ const fetchRealtimeLyrics: (trackId: string) => Promise<RealtimeLyrics> = async 
         method: "GET",
         headers: {
             "accept": "application/json",
-            "authorization": "Bearer BQC_EQdJqtro0wFHO2ozz7pwq4KpAqY64ekKttPMqzD8644EEJanIeDfC3VELP8fu5kP6MlOQ5Qc4jCp3fmsCeN_5mpLCQ2hIMppT-5bpK0LWEZ1cnXGiEKAlXwUjWJmSlA_Cw3P1n4KpMI-xq249JXwyR_EhR_K-WpHNIL2q9yQRmYZ67MxldOc5BYg2ky427Q0pjfLRoszhDyzAgAIR8642QE3BMWm005fVeiFa-M4p7vJBd46O7VGZIirmZvexDvoMMtJWpiJPgDUajMwQtAAR-SaSb5kYkqcUo_ILG_qYFMFiUuYnM34tx9dGPoGraXmBkONqT6injjgwEvw",
+            "authorization": "Bearer BQBiJpJaFDT-XL5DCSpC_lPZRIICCIFnPYvmaYErbqTv_e-MHdg3iW3hWmV07DUOfjo49GA2vCjCNrDfziDqYLgN2ktECleWCMaZeRt_Dz16RZWf73qA3AsDMw6I0V80J4VLRINjcsjXxrovthnddbdfxWByrcCfRJNrsAUOoP6E4rgHHU6aFge9hsgiVGsj5mjxcpoj-Nx2H-uy0wuNuWNm_bTzyIy-9d2kvesyhXxPtRmLFte8Ip61TBvjjitcDg1bZBN7TpGNmYZQ0O8fRonzINE3slRXqvzrqiZOsumtl0j7_VUsHHRPNwC_czoyUyCJVJGw00XK0jmlHZrk",
             "user-agent": "Spotify/8.7.78.373 Android/29 (Android SDK built for arm64)",
             "spotify-app-version": "8.7.78.373"
         }
@@ -126,16 +128,22 @@ const fetchRealtimeLyrics: (trackId: string) => Promise<RealtimeLyrics> = async 
     return data
 }
 
-const COMMAND = "/Users/liljack/Documents/repos/spotify-realtime-lyrics/test.applescript";
+const script = `
+    tell application "Spotify"
+        repeat until application "Spotify" is not running
+            set cstate to ((player position * 1000) as integer)
+            log cstate
+        end repeat
+    end tell
+`
 
 const pipeCommandOutput = (command: string, callback: any) => {
     const cmd = executeCustom(command);
     cmd.stdout.setEncoding("utf8");
-    cmd.stdout.on("data", (data) => wgt.setState({ position: JSON.parse(data).position }));
-    cmd.stderr.setEncoding("utf8");
-    // cmd.stderr.on("data", (data) => wgt.setState({ position: data }));
+    // cmd.stdout.on("data", (data) => wgt.setState({ position: JSON.parse(data).position }));
+    // Why it works on stderr and not stdout ?
     cmd.stderr.on("data", callback);
-    cmd.on("close", (code) => wgt.setState({ position: code }));
+    cmd.on("close", () => {});
 }
 
 spotify.isRunning((err: any, isRunning: boolean) => {
@@ -155,17 +163,8 @@ spotify.isRunning((err: any, isRunning: boolean) => {
             position: 0
         })
 
-        debugger;
-
-        // dev({ a: syncLyrics(data.lyrics.lines, 17980)});
-
-        pipeCommandOutput(COMMAND, (x: any) => {
-            // const parse = JSON.parse(x);
+        pipeCommandOutput(`osascript -e '${script}'`, (x: any) => {
             const currIndex = syncLyrics(data.lyrics.lines, x)
-
-            debugger;
-
-            // wgt.setState({ position: x, line: data.lyrics.lines[currIndex]?.words })
             wgt.setState({ position: x, currentLine: currIndex })
         })
     })
