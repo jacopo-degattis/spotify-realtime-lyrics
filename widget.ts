@@ -1,27 +1,12 @@
 import "@johnlindquist/kit"
 
+import { exec as executeCustom } from "child_process";
 import { WidgetAPI } from "@johnlindquist/kit/types/pro";
-import { ChildProcess, exec as executeCustom } from "child_process";
+
 
 // SQLITE3 error is thrown, is there a way to fix it ?
 // const chrome = await npm("chrome-cookies-secure");
 const spotify = await npm("spotify-node-applescript");
-
-interface Track {
-    artist: string,
-    album: string,
-    disc_number: number,
-    duration: number,
-    played_count: number,
-    track_number: number,
-    starred: boolean,
-    popularity: number,
-    id: string,
-    name: string,
-    album_artist: string,
-    artwork_url: string,
-    spotify_url: string
-}
 
 interface RealtimeLyricsLines {    
     startTimeMs: string,
@@ -53,7 +38,6 @@ const state = {
     previousProcess: null,
     isProcessLaunched: false,
     previousTrack: null,
-    backgroundColor: "#7C7B7C" 
 }
 
 const wgt: WidgetAPI = await widget(`
@@ -100,7 +84,6 @@ const wgt: WidgetAPI = await widget(`
 
         .grayed-out:hover {
             cursor: pointer;
-            transition-duration: 0.2s;
             color: white;
         }
 
@@ -112,38 +95,34 @@ const wgt: WidgetAPI = await widget(`
     </style>
 
     <script>
-        const handler = (event) => {
-            ipcRenderer.send("WIDGET_CLICK", {
-                targetId: "jumpto",
-                index: event.target.dataset.index,
-                name: event.target.dataset.name,
-                widgetId: window.widgetId,
-            })
-        }
-
-        const setupButtons = () => {
+        setTimeout(() => {
             const buttons = document.querySelectorAll("#unfocused-line");
+            
             buttons.forEach((button) => {
-                button.removeEventListener("click", handler);
-                button.addEventListener("click", handler);
+                button.addEventListener("click", (event) => {
+                    ipcRenderer.send("WIDGET_CLICK", {
+                        targetId: "jumpto",
+                        index: event.target.dataset.index,
+                        name: event.target.dataset.name,
+                        widgetId: window.widgetId,
+                    })
+                })
             })
-        }
 
-        setTimeout(setupButtons, 2000);
-        window.onSetState = setupButtons;
-        
+        }, 2000)
+
     </script>
 `, {
     width: 700,
     height: 1200,
     alwaysOnTop: true,
-    backgroundColor: state.backgroundColor
+    backgroundColor: "#7C7B7C"
 })
 
 wgt.onClick((event: any) => {
+    dev({ e: event });
     if (event.targetId === "jumpto") {
-        const seconds = state.currentLyrics[parseInt(event.name)].startTimeMs / 1000;
-        spotify.jumpTo(seconds, () => {});
+        spotify.jumpTo(state.currentLyrics[parseInt(event.name)].startTimeMs / 1000, () => console.log("JUMPED TO"));
     }
 })
 
@@ -153,8 +132,8 @@ const syncLyrics: (
 ) => number = (lyrics, time) => {
     const scores = [];
 
-    lyrics.forEach((lyric) => {
-        const score = time - parseInt(lyric.startTimeMs);
+    lyrics.forEach((lyric: any) => {
+        const score = time - lyric.startTimeMs;
 
         if (score >= 0) scores.push(score);
     })
@@ -175,7 +154,7 @@ const fetchRealtimeLyrics: (
         method: "GET",
         headers: {
             "accept": "application/json",
-            "authorization": "Bearer BQAf7VWG4wmJtnRlPa3yVvdhzCh9SSeNsZnfAPREji__m3rQKiuyzDq4hYBWX-7bjeovECQYtCL-da4zpswhnF87MelJc-K_HeYRKAzmel3ynz00Hm6S-Y8p94PWs95tskLHAygFeXDuz_ydi2adgvxpIR3Nhow3Hic0LNSSXygR33SZHjJndsCoCiJSS7RsO-mF_C-Ou6dtAbYVUGDZIihFVgXkxutl6hxrmOIADdYqZXxv2NwuE1KdCWuIYTXmSdNxOb1peZBw1qQLdG7bGMRR5PNez0DiB0jAfXGb-YO0YZI3T92HuxinWWYaANOADW9TdjC70g1IpH3Js0s8",
+            "authorization": "Bearer BQDLjLuzEF-TZOwwhuUf8Y41jsb-CYCNb-qapZqVfQiDoW_AxpEfE3fj5UTS4J_3yD6DD3_xTiJc9kAbPWNCNWOFhY4ZgXxX7SehqbWT8wJk3db53lsrBAVmDiuTmBY3vb3SKH_m4M3uzpdFEwBaJLG66taYPmwAtomm77j2rpikTkn4OG3tKTYcxP7xkj7if95d1zaBWHGCipocI4i09s6iEAp2_b8WwkjK7XaWaTU6Ur_mefI0rRJr5VP6jpqz4Ve5mZ8f-ZQfAd8e-Oe8qRAg5D0hhlnf833kL9FCNfLLUKXch61_oYw1Ka2wwf43IDu4IE8y8oHoKlFnFuH6",
             "user-agent": "Spotify/8.7.78.373 Android/29 (Android SDK built for arm64)",
             "spotify-app-version": "8.7.78.373"
         }
@@ -200,24 +179,23 @@ const script = `
 const pipeCommandOutput = (command: string, callback: (x: any) => void) => {
     const cmd = executeCustom(command);
     cmd.stdout.setEncoding("utf8");
+    // cmd.stdout.on("data", (data) => wgt.setState({ position: JSON.parse(data).position }));
+    // Why it works on stderr and not stdout ?
     cmd.stderr.on("data", callback);
+    cmd.on("close", () => {});
     return cmd;
 }
 
-const killAndRelaunch = (
-    command: string,
-    prevProcess: ChildProcess,
-    callback: (x: any) => void
-) => {
+const killAndRelaunch = (command: string, prevProcess: any, callback: (x: any) => void) => {
     prevProcess.kill();
     return pipeCommandOutput(command, callback);
 }
 
 setInterval(() => {
     spotify.isRunning((err: any, isRunning: boolean) => {
-        if (!isRunning || err) return
+        if (!isRunning) return
 
-        spotify.getTrack(async (err: any, track: Track) => {
+        spotify.getTrack(async (err: any, track: any) => {
             if (err) return
 
             if (state.previousTrack !== track.name) {
