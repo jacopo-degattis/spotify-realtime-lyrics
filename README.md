@@ -1,5 +1,9 @@
 # Spotify Realtime Lyrics
 
+## Preview
+
+![200166276-38377773-be61-4058-9c3c-e1065fd585e5](https://user-images.githubusercontent.com/86744469/200255388-17b47ced-3036-416d-bd35-c739efa74d7c.png)
+
 ## Description
 
 This repo contains a [Scripkit](https://github.com/johnlindquist/kit) widget that provides lyrics for the currently playing spotify track. The most cool thing right now is the possibility to have the sing-along feature exactly as if you are inside of the official Spotify client.
